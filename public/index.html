@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <style>
+    .hidden {
+      display: none;
+    }
+
+  </style>
+</head>
+
+<body>
+  <ul id="messages"></ul>
+  <div id="start-phase">
+    <button id="start">スタート</button>
+  </div>
+  <div class="hidden" id="standby-phase">
+    <p>プレイヤーの参加を待っています。</p>
+  </div>
+  <div class="hidden" id="select-phase">
+    <form id="moves">
+      <button id="goo">グー</button>
+      <button id="choki">チョキ</button>
+      <button id="paa">パー</button>
+    </form>
+    <div id="selected-move">
+      <p>
+        あなたの手: <span class="my-move"> 選択中...</span>
+      </p>
+      <p>
+        相手の手: <span class="opponent-move"> 選択中...</span>
+      </p>
+    </div>
+  </div>
+  <div class="hidden" id="result-phase">
+    <p>結果: <span></span></p>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const startPhase = document.getElementById('start-phase');
+    const standbyPhase = document.getElementById('standby-phase');
+    const start = document.getElementById('start');
+    const selectPhase = document.getElementById('select-phase');
+    const moves = document.getElementById('moves');
+    const goo = document.getElementById('goo');
+    const choki = document.getElementById('choki');
+    const paa = document.getElementById('paa');
+    const myMove = document.querySelector('.my-move');
+    const opponentMove = document.querySelector('.opponent-move');
+    const resultPhase = document.getElementById('result-phase');
+    let myId = null;
+    let game = {};
+
+    socket.on('connect', () => {
+      myId = socket.id;
+      console.log('ID: ' + myId);
+      socket.on('message', (data) => {
+        game = JSON.parse(data);
+        console.log('Received a message from the server:', game);
+      });
+    });
+
+    start.addEventListener('click', () => {
+      const player = {
+        id: socket.id,
+        move: null,
+        phase: 'standby',
+      };
+      const requestJson = JSON.stringify(player);
+      socket.emit('standby', requestJson);
+
+      startPhase.classList.add('hidden');
+      standbyPhase.classList.remove('hidden');
+    });
+
+    socket.on('game start', (responseJson) => {
+      console.log('game start');
+
+      standbyPhase.classList.add('hidden');
+      selectPhase.classList.remove('hidden');
+    });
+
+    goo.addEventListener('click', () => {
+      const player = {
+        id: myId,
+        move: 'goo',
+      };
+      const requestJson = JSON.stringify(player);
+      socket.emit('select', requestJson);
+    });
+
+    moves.addEventListener('click', (e) => {
+      e.preventDefault();
+      const player = {
+        id: myId,
+        move: e.target.id,
+      };
+      console.log(player);
+      const requestJson = JSON.stringify(player);
+      socket.emit('select', requestJson);
+
+      moves.classList.add('hidden');
+      if (player.move === 'goo')
+        myMove.textContent = 'グー';
+      else if (player.move === 'choki')
+        myMove.textContent = 'チョキ';
+      else if (player.move === 'paa')
+        myMove.textContent = 'パー';
+    });
+
+    socket.on('draw', () => {
+      console.log('draw');
+      selectPhase.classList.add('hidden');
+      resultPhase.classList.remove('hidden');
+      resultPhase.querySelector('span').textContent = '引き分け';
+    });
+
+    socket.on('game set', (winner) => {
+      console.log(winner + ' ' + myId);
+      if (winner == myId) {
+        selectPhase.classList.add('hidden');
+        resultPhase.classList.remove('hidden');
+        resultPhase.querySelector('span').textContent = 'あなたの勝利！';
+      } else {
+        selectPhase.classList.add('hidden');
+        resultPhase.classList.remove('hidden');
+        resultPhase.querySelector('span').textContent = 'あなたの負け...';
+      }
+    });
+
+    socket.on('game init', () => {
+      //　すべての要素を非表示にして、スタート画面を表示
+      startPhase.classList.remove('hidden');
+      standbyPhase.classList.add('hidden');
+      selectPhase.classList.add('hidden');
+      resultPhase.classList.add('hidden');
+      moves.classList.remove('hidden');
+      myMove.textContent = '選択中...';
+      opponentMove.textContent = '選択中...';
+    })
+
+  </script>
+</body>
+
+</html>
